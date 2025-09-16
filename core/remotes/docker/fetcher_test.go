@@ -83,7 +83,7 @@ func TestFetcherOpen(t *testing.T) {
 	checkReader := func(o int64) {
 		t.Helper()
 
-		rc, err := f.open(ctx, req, "", o, true)
+		rc, cl, err := f.open(ctx, req, "", o, true)
 		if err != nil {
 			t.Fatalf("failed to open: %+v", err)
 		}
@@ -94,6 +94,10 @@ func TestFetcherOpen(t *testing.T) {
 		expected := content[o:]
 		if len(b) != len(expected) {
 			t.Errorf("unexpected length %d, expected %d", len(b), len(expected))
+			return
+		}
+		if cl != int64(len(expected)) {
+			t.Errorf("unexpected content length %d, expected %d", cl, len(expected))
 			return
 		}
 		for i, c := range expected {
@@ -123,7 +127,7 @@ func TestFetcherOpen(t *testing.T) {
 	// Check that server returning a different content range
 	// then requested errors
 	start = 30
-	_, err = f.open(ctx, req, "", 20, true)
+	_, _, err = f.open(ctx, req, "", 20, true)
 	if err == nil {
 		t.Fatal("expected error opening with invalid server response")
 	}
@@ -215,7 +219,7 @@ func TestFetcherOpenParallel(t *testing.T) {
 	checkReader := func(offset int64) {
 		t.Helper()
 
-		rc, err := f.open(ctx, req, "", offset, true)
+		rc, _, err := f.open(ctx, req, "", offset, true)
 		if err != nil {
 			t.Fatalf("failed to open: %+v", err)
 		}
@@ -260,7 +264,7 @@ func TestFetcherOpenParallel(t *testing.T) {
 	// Check that server returning a different content range
 	// than requested errors
 	forceRange = []httpRange{{start: 10, length: size - 20}}
-	_, err = f.open(ctx, req, "", 20, true)
+	_, _, err = f.open(ctx, req, "", 20, true)
 	if err == nil {
 		t.Fatal("expected error opening with invalid server response")
 	}
@@ -272,14 +276,14 @@ func TestFetcherOpenParallel(t *testing.T) {
 
 	failAfter = 1
 	forceRange = []httpRange{{start: 20}}
-	_, err = f.open(ctx, req, "", 20, true)
+	_, _, err = f.open(ctx, req, "", 20, true)
 	assert.ErrorContains(t, err, "unexpected status")
 	forceRange = nil
 	failAfter = 0
 
 	// test a case when a subsequent request fails and shouldn't have
 	failAfter = 1 * 1024 * 1024
-	body, err := f.open(ctx, req, "", 0, true)
+	body, _, err := f.open(ctx, req, "", 0, true)
 	assert.NoError(t, err)
 	_, err = io.ReadAll(body)
 	assert.Error(t, err, "this should have failed")
@@ -407,7 +411,7 @@ func TestContentEncoding(t *testing.T) {
 
 			req := f.request(host, http.MethodGet)
 
-			rc, err := f.open(context.Background(), req, "", 0, true)
+			rc, _, err := f.open(context.Background(), req, "", 0, true)
 			if err != nil {
 				t.Fatalf("failed to open for encoding %s: %+v", tc.encodingHeader, err)
 			}
@@ -437,6 +441,7 @@ func TestDockerFetcherOpen(t *testing.T) {
 		mockedStatus           int
 		mockedErr              error
 		want                   io.ReadCloser
+		wantLen                int64
 		wantErr                bool
 		wantServerMessageError bool
 		wantPlainError         bool
@@ -542,9 +547,10 @@ func TestDockerFetcherOpen(t *testing.T) {
 
 			req := f.request(host, http.MethodGet)
 
-			got, err := f.open(context.TODO(), req, "", 0, tt.lastHost)
+			got, cl, err := f.open(context.TODO(), req, "", 0, tt.lastHost)
 			assert.Equal(t, tt.wantErr, err != nil)
 			assert.Equal(t, tt.want, got)
+			assert.Equal(t, tt.wantLen, cl)
 			assert.Equal(t, 0, tt.retries)
 			if tt.wantErr {
 				expectedError := fmt.Sprintf("unexpected status from GET request to %s/ns: %v %s", s.URL, tt.mockedStatus, http.StatusText(tt.mockedStatus))
@@ -585,11 +591,11 @@ func TestDockerFetcherOpenLimiterDeadlock(t *testing.T) {
 	}
 
 	req := f.request(host, http.MethodGet)
-	_, err = f.open(context.Background(), req, "", 0, true)
+	_, _, err = f.open(context.Background(), req, "", 0, true)
 	assert.Error(t, err)
 
 	// verify that the limiter Release has been successfully called when the last open error occurred
-	_, err = f.open(context.Background(), req, "", 0, true)
+	_, _, err = f.open(context.Background(), req, "", 0, true)
 	assert.Error(t, err)
 }
 

@@ -503,10 +503,16 @@ func (r *dockerResolver) base(refspec reference.Spec) (*dockerBase, error) {
 	}, nil
 }
 
-func (r *dockerBase) filterHosts(caps HostCapabilities) (hosts []RegistryHost) {
+// filterHosts returns a set of hosts matching the given capabilities
+// Multiple arguments are treated as "OR"
+// Each argument may be a set of capabilities in which all must be satisfied to match
+func (r *dockerBase) filterHosts(capsets ...HostCapabilities) (hosts []RegistryHost) {
 	for _, host := range r.hosts {
-		if host.Capabilities.Has(caps) {
-			hosts = append(hosts, host)
+		for _, caps := range capsets {
+			if host.Capabilities.Has(caps) {
+				hosts = append(hosts, host)
+				break
+			}
 		}
 	}
 	return
@@ -551,10 +557,7 @@ func (r *request) authorize(ctx context.Context, req *http.Request) error {
 	return nil
 }
 
-func (r *request) addNamespace(ns string) (err error) {
-	if !r.host.isProxy(ns) {
-		return nil
-	}
+func (r *request) addQuery(key, value string) (err error) {
 	var q url.Values
 	// Parse query
 	if i := strings.IndexByte(r.path, '?'); i > 0 {
@@ -567,12 +570,20 @@ func (r *request) addNamespace(ns string) (err error) {
 		r.path = r.path + "?"
 		q = url.Values{}
 	}
-	q.Add("ns", ns)
+	q.Add(key, value)
 
 	r.path = r.path + q.Encode()
 
 	return
 }
+
+func (r *request) addNamespace(ns string) error {
+	if !r.host.isProxy(ns) {
+		return nil
+	}
+	return r.addQuery("ns", ns)
+}
+
 
 type request struct {
 	method string
