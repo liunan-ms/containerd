@@ -31,6 +31,8 @@ import (
 
 func (r dockerFetcher) FetchReferrers(ctx context.Context, dgst digest.Digest, artifactTypes ...string) (io.ReadCloser, ocispec.Descriptor, error) {
 	var desc ocispec.Descriptor
+	// The referrers endpoint returns an image index
+	// The image index contains a list of referrer references.
 	desc.MediaType = ocispec.MediaTypeImageIndex
 	ctx = log.WithLogger(ctx, log.G(ctx).WithField("digest", dgst))
 
@@ -45,6 +47,9 @@ func (r dockerFetcher) FetchReferrers(ctx context.Context, dgst digest.Digest, a
 	}
 
 	for _, host := range hosts {
+		fmt.Printf("Trying to fetch referrers from host: %s\n", host.Host)
+		fmt.Printf("Host capabilities include referrers: %t\n", host.Capabilities.Has(HostCapabilityReferrers))
+		fmt.Printf("Host capabilities include resolve: %t\n", host.Capabilities.Has(HostCapabilityResolve))
 		var req *request
 		if host.Capabilities.Has(HostCapabilityReferrers) {
 			req = r.request(host, http.MethodGet, "referrers", dgst.String())
@@ -69,8 +74,12 @@ func (r dockerFetcher) FetchReferrers(ctx context.Context, dgst digest.Digest, a
 				return rc, desc, nil
 			}
 		}
+		// Fetch the Cosign signatures which is a manifest with a new tag,
+		// instead of living in the referrers list
+		// This seems a fallback for registries that do not support the referrers
 		if host.Capabilities.Has(HostCapabilityResolve) {
-			req = r.request(host, http.MethodGet, "manifests", strings.Replace(dgst.String(), ":", "-", 1))
+			req = r.request(host, http.MethodGet, "manifests", strings.Replace(dgst.String(), ":", "-", 1)+".sig")
+			fmt.Printf("Trying to fetch signatures manifest by tag: %v\n", req)
 			if err := req.addNamespace(r.refspec.Hostname()); err != nil {
 				return nil, desc, err
 			}

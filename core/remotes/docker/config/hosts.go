@@ -97,7 +97,9 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 		if hosts == nil {
 			hosts = make([]hostConfig, 1)
 		}
+		fmt.Printf("Loaded %d hosts from directory for %q\n", len(hosts), host)
 		if len(hosts) > 0 && hosts[len(hosts)-1].host == "" {
+			fmt.Printf("Adding default host for %q\n", host)
 			if host == "docker.io" {
 				hosts[len(hosts)-1].scheme = "https"
 				hosts[len(hosts)-1].host = "registry-1.docker.io"
@@ -131,7 +133,12 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 				}
 			}
 			hosts[len(hosts)-1].path = "/v2"
-			hosts[len(hosts)-1].capabilities = docker.HostCapabilityPull | docker.HostCapabilityResolve | docker.HostCapabilityPush
+			// How to determine if referrers is supported in the host registry??
+			hosts[len(hosts)-1].capabilities = docker.HostCapabilityPull | 
+				docker.HostCapabilityResolve | 
+				docker.HostCapabilityPush | 
+				docker.HostCapabilityReferrers
+			fmt.Printf("Default host capabilities as %v\n", hosts[len(hosts)-1].capabilities)
 		}
 
 		// tlsConfigured indicates that TLS was configured and HTTP endpoints should
