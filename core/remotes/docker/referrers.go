@@ -49,7 +49,6 @@ func (r dockerFetcher) FetchReferrers(ctx context.Context, dgst digest.Digest, a
 	for _, host := range hosts {
 		fmt.Printf("Trying to fetch referrers from host: %s\n", host.Host)
 		fmt.Printf("Host capabilities include referrers: %t\n", host.Capabilities.Has(HostCapabilityReferrers))
-		fmt.Printf("Host capabilities include resolve: %t\n", host.Capabilities.Has(HostCapabilityResolve))
 		var req *request
 		if host.Capabilities.Has(HostCapabilityReferrers) {
 			req = r.request(host, http.MethodGet, "referrers", dgst.String())
@@ -74,9 +73,9 @@ func (r dockerFetcher) FetchReferrers(ctx context.Context, dgst digest.Digest, a
 				return rc, desc, nil
 			}
 		}
-		// Fetch the Cosign signatures which is a manifest with a new tag,
-		// instead of living in the referrers list
 		// This seems a fallback for registries that do not support the referrers
+		// For example, a Cosign signature is a manifest with a new tag living in the same repo,
+		// rather than living in the referrers list
 		if host.Capabilities.Has(HostCapabilityResolve) {
 			req = r.request(host, http.MethodGet, "manifests", strings.Replace(dgst.String(), ":", "-", 1)+".sig")
 			fmt.Printf("Trying to fetch signatures manifest by tag: %v\n", req)
