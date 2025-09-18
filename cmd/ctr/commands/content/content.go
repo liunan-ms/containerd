@@ -50,6 +50,7 @@ var (
 			fetchCommand,
 			fetchObjectCommand,
 			fetchBlobCommand,
+			fetchReferrersCommand,
 			getCommand,
 			ingestCommand,
 			listCommand,
@@ -503,6 +504,67 @@ var (
 				if err != nil {
 					return err
 				}
+			}
+			return nil
+		},
+	}
+
+	fetchReferrersCommand = &cli.Command{
+		Name:        "fetch-referrers",
+		Usage:       "Retrieve referrers for a manifest from a remote",
+		ArgsUsage:   "[flags] <remote> <digest>",
+		Description: `Fetch referrers for a manifest by digest from a remote.`,
+		Flags: commands.RegistryFlags,
+		Action: func(cliContext *cli.Context) error {
+			var (
+				ref  = cliContext.Args().First()
+				args = cliContext.Args().Tail()
+			)
+			if len(args) == 0 {
+				return errors.New("must specify a digest")
+			}
+
+			digestStr := args[0]
+			artifactTypes := []string{}
+			if len(args) > 1 {
+				artifactTypes = args[1:]
+			}
+
+			ctx, cancel := commands.AppContext(cliContext)
+			defer cancel()
+
+			resolver, err := commands.GetResolver(ctx, cliContext)
+			if err != nil {
+				return err
+			}
+
+			ctx = log.WithLogger(ctx, log.G(ctx).WithField("ref", ref))
+
+			log.G(ctx).Tracef("resolving")
+			fetcher, err := resolver.Fetcher(ctx, ref)
+			if err != nil {
+				return err
+			}
+
+			referrersFetcher, ok := fetcher.(remotes.ReferrersFetcher)
+			if !ok {
+				return fmt.Errorf("fetcher %T does not implement remotes.ReferrersFetcher", fetcher)
+			}
+
+			dgst, err := digest.Parse(digestStr)
+			if err != nil {
+				return err
+			}
+
+			rc, desc, err := referrersFetcher.FetchReferrers(ctx, dgst, artifactTypes...)
+			if err != nil {
+				return err
+			}
+			log.G(ctx).Debugf("desc=%+v", desc)
+			_, err = io.Copy(os.Stdout, rc)
+			rc.Close()
+			if err != nil {
+				return err
 			}
 			return nil
 		},
