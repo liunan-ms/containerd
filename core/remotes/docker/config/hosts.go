@@ -79,7 +79,6 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 		var hosts []hostConfig
 		if options.HostDir != nil {
 			dir, err := options.HostDir(host)
-			fmt.Printf("Using hosts directory: %s\n", dir)
 			if err != nil && !errdefs.IsNotFound(err) {
 				return nil, err
 			}

@@ -47,8 +47,6 @@ func (r dockerFetcher) FetchReferrers(ctx context.Context, dgst digest.Digest, a
 	}
 
 	for _, host := range hosts {
-		fmt.Printf("Trying to fetch referrers from host: %s\n", host.Host)
-		fmt.Printf("Host capabilities include referrers: %t\n", host.Capabilities.Has(HostCapabilityReferrers))
 		var req *request
 		if host.Capabilities.Has(HostCapabilityReferrers) {
 			req = r.request(host, http.MethodGet, "referrers", dgst.String())
@@ -78,7 +76,6 @@ func (r dockerFetcher) FetchReferrers(ctx context.Context, dgst digest.Digest, a
 		// rather than living in the referrers list
 		if host.Capabilities.Has(HostCapabilityResolve) {
 			req = r.request(host, http.MethodGet, "manifests", strings.Replace(dgst.String(), ":", "-", 1)+".sig")
-			fmt.Printf("Trying to fetch signatures manifest by tag: %v\n", req)
 			if err := req.addNamespace(r.refspec.Hostname()); err != nil {
 				return nil, desc, err
 			}
