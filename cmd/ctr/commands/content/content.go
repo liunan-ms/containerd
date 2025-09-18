@@ -567,15 +567,6 @@ var (
 				return err
 			}
 			return nil
-			// tw := tabwriter.NewWriter(os.Stdout, 1, 8, 1, '\t', 0)
-			// fmt.Fprintln(tw, "DIGEST\tSIZE\tMEDIA TYPE")
-			// for _, ref := range referrers {
-			// 	fmt.Fprintf(tw, "%s\t%s\t%s\n",
-			// 		ref.Digest,
-			// 		units.HumanSize(float64(ref.Size)),
-			// 		ref.MediaType)
-			// }
-			// return tw.Flush()
 		},
 	}
 

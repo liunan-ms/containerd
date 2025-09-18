@@ -79,6 +79,7 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 		var hosts []hostConfig
 		if options.HostDir != nil {
 			dir, err := options.HostDir(host)
+			fmt.Printf("Using hosts directory: %s\n", dir)
 			if err != nil && !errdefs.IsNotFound(err) {
 				return nil, err
 			}
@@ -136,8 +137,7 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 			// How to determine if referrers is supported in the host registry??
 			hosts[len(hosts)-1].capabilities = docker.HostCapabilityPull | 
 				docker.HostCapabilityResolve | 
-				docker.HostCapabilityPush | 
-				docker.HostCapabilityReferrers
+				docker.HostCapabilityPush
 			fmt.Printf("Default host capabilities as %v\n", hosts[len(hosts)-1].capabilities)
 		}
 
@@ -347,6 +347,7 @@ type hostFileConfig struct {
 	//  - pull
 	//  - resolve
 	//  - push
+	//  - referrers
 	Capabilities []string `toml:"capabilities"`
 
 	// CACert are the public key certificates for TLS
@@ -416,7 +417,7 @@ func parseHostsFile(baseDir string, b []byte) ([]hostConfig, error) {
 		}
 		hosts = append(hosts, parsed)
 	}
-
+	// The last host is specified by `server` in the hosts.toml file.
 	// Parse root host config and append it as the last element
 	parsed, err := parseHostConfig(c.Server, baseDir, c.hostFileConfig)
 	if err != nil {
@@ -465,6 +466,9 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 				result.capabilities |= docker.HostCapabilityResolve
 			case "push":
 				result.capabilities |= docker.HostCapabilityPush
+			// enable referrers support if specified in the config
+			case "referrers":
+				result.capabilities |= docker.HostCapabilityReferrers
 			default:
 				return hostConfig{}, fmt.Errorf("unknown capability %v", c)
 			}
@@ -547,7 +551,6 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 		}
 		result.dialTimeout = &dialTimeout
 	}
-
 	return result, nil
 }
 
